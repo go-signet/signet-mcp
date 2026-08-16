@@ -160,9 +160,12 @@ func (d *Deps) validateCIMD(
 	return nil, out, nil
 }
 
-// fetchCIMD retrieves the document without following redirects, enforcing the
-// 64 KiB cap and a JSON content type. Failures are reported as checks so the
-// tool can still render partial results.
+// fetchCIMD retrieves the document without following redirects and enforces
+// the 64 KiB cap. A non-JSON Content-Type is recorded as a failing check —
+// which makes the overall result invalid — but parsing still continues so the
+// tool can report every other problem with the document in one pass; this is
+// a diagnostics tool, not a gatekeeper (Signet itself performs the
+// authoritative enforcement at /authorize time).
 func fetchCIMD(
 	ctx context.Context,
 	httpc *http.Client,

@@ -105,9 +105,10 @@ func resourceList(resource string) []string {
 // --- 10. signet_device_flow_start ---------------------------------------
 
 type deviceStartIn struct {
-	ClientID string   `json:"client_id,omitempty" jsonschema:"OAuth client_id; defaults to the configured client"`
-	Scopes   []string `json:"scopes,omitempty"    jsonschema:"scopes to request; empty means the client's full scope set"`
-	Resource string   `json:"resource,omitempty"  jsonschema:"RFC 8707 resource identifier to bind the token audience to"`
+	ClientID     string   `json:"client_id,omitempty"     jsonschema:"OAuth client_id; defaults to the configured client"`
+	ClientSecret string   `json:"client_secret,omitempty" jsonschema:"client_secret, only for confidential clients"`
+	Scopes       []string `json:"scopes,omitempty"        jsonschema:"scopes to request; empty means the client's full scope set"`
+	Resource     string   `json:"resource,omitempty"      jsonschema:"RFC 8707 resource identifier to bind the token audience to"`
 }
 
 type deviceStartOut struct {
@@ -126,13 +127,14 @@ func (d *Deps) deviceFlowStart(
 	_ *mcp.CallToolRequest,
 	in deviceStartIn,
 ) (*mcp.CallToolResult, deviceStartOut, error) {
-	clientID, _ := d.clientCreds(in.ClientID, "")
+	clientID, clientSecret := d.clientCreds(in.ClientID, in.ClientSecret)
 	if clientID == "" {
 		return nil, deviceStartOut{}, errors.New(
 			"device flow requires a client_id: pass one or start signet-mcp with --client-id",
 		)
 	}
-	da, err := d.API.DeviceCodeRequest(ctx, clientID, "", in.Scopes, resourceList(in.Resource))
+	da, err := d.API.DeviceCodeRequest(
+		ctx, clientID, clientSecret, in.Scopes, resourceList(in.Resource))
 	if err != nil {
 		return nil, deviceStartOut{}, explainOAuthError("device authorization", err)
 	}
@@ -213,7 +215,14 @@ func (d *Deps) deviceFlowPoll(
 			return nil, devicePollOut{}, explainOAuthError("device flow polling", err)
 		}
 		switch apiErr.Code {
-		case "authorization_pending":
+		case "authorization_pending", "slow_down":
+			reason := "the user has not finished authorizing yet (RFC 8628 authorization_pending)"
+			if apiErr.Code == "slow_down" {
+				// RFC 8628 §3.5: back off by 5 seconds and never poll
+				// again without waiting the new interval first.
+				interval += 5 * time.Second
+				reason = "the server asked to poll less often (RFC 8628 slow_down) — interval raised by 5 seconds"
+			}
 			if time.Now().Add(interval).Before(deadline) {
 				select {
 				case <-ctx.Done():
@@ -225,14 +234,9 @@ func (d *Deps) deviceFlowPoll(
 			return nil, devicePollOut{
 				Status: "pending",
 				Explanation: fmt.Sprintf(
-					"the user has not finished authorizing yet (RFC 8628 authorization_pending) — "+
-						"poll again in %d seconds",
-					int(interval.Seconds()),
+					"%s — poll again in %d seconds", reason, int(interval.Seconds()),
 				),
 			}, nil
-		case "slow_down":
-			interval += 5 * time.Second
-			continue
 		case "access_denied":
 			return nil, devicePollOut{
 				Status:      "denied",

@@ -43,11 +43,29 @@ func NewDeps(api *signetapi.Client, cfg *config.Config, log *slog.Logger) *Deps 
 			},
 		},
 	}
-	d.verifier = sync.OnceValues(func() (*jwksauth.Verifier, error) {
+	// Lazy verifier construction: discovery is bounded by the configured
+	// HTTP timeout, and only a successful verifier is cached so a transient
+	// discovery failure does not poison every later signet_decode_jwt call.
+	var (
+		mu     sync.Mutex
+		cached *jwksauth.Verifier
+	)
+	d.verifier = func() (*jwksauth.Verifier, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if cached != nil {
+			return cached, nil
+		}
 		// Audience is checked per-tool (callers debug tokens minted for
 		// arbitrary resources), so skip it here.
-		return jwksauth.NewVerifierSkipAudience(context.Background(), cfg.Issuer)
-	})
+		v, err := jwksauth.NewVerifierSkipAudience(context.Background(), cfg.Issuer,
+			jwksauth.WithDiscoveryTimeout(cfg.HTTPTimeout))
+		if err != nil {
+			return nil, err
+		}
+		cached = v
+		return v, nil
+	}
 	return d
 }
 
