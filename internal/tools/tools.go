@@ -6,8 +6,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/netip"
 	"sync"
+	"syscall"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -34,15 +37,23 @@ type Deps struct {
 
 // NewDeps wires up a Deps for the given configuration.
 func NewDeps(api *signetapi.Client, cfg *config.Config, log *slog.Logger) *Deps {
-	d := &Deps{
-		API: api, Cfg: cfg, Log: log,
-		cimdHTTP: &http.Client{
-			Timeout: cfg.HTTPTimeout,
-			CheckRedirect: func(*http.Request, []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
+	cimdHTTP := &http.Client{
+		Timeout: cfg.HTTPTimeout,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
 		},
 	}
+	if !cfg.CIMDAllowPrivate {
+		// SSRF guard, mirroring Signet's own CIMD fetcher: refuse
+		// connections to loopback, private, and link-local addresses so
+		// signet_validate_cimd cannot probe the server's network. The check
+		// runs at dial time on the resolved IP, so DNS tricks cannot
+		// bypass it. Opt out with --cimd-allow-private-networks.
+		cimdHTTP.Transport = &http.Transport{
+			DialContext: (&net.Dialer{Control: refusePrivateAddr}).DialContext,
+		}
+	}
+	d := &Deps{API: api, Cfg: cfg, Log: log, cimdHTTP: cimdHTTP}
 	// Lazy verifier construction: discovery is bounded by the configured
 	// HTTP timeout, and only a successful verifier is cached so a transient
 	// discovery failure does not poison every later signet_decode_jwt call.
@@ -90,6 +101,28 @@ func Register(server *mcp.Server, d *Deps) error {
 		default:
 			return fmt.Errorf("unknown toolset %q", ts)
 		}
+	}
+	return nil
+}
+
+// refusePrivateAddr is a net.Dialer Control hook that rejects any resolved
+// address that is not public unicast: loopback, RFC 1918/ULA private,
+// link-local (including 169.254.169.254-style metadata endpoints),
+// multicast, and unspecified addresses are all refused.
+func refusePrivateAddr(_, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return fmt.Errorf("cannot parse dial address %q: %w", address, err)
+	}
+	ip, err := netip.ParseAddr(host)
+	if err != nil {
+		return fmt.Errorf("cannot parse dial IP %q: %w", host, err)
+	}
+	ip = ip.Unmap()
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
+		return fmt.Errorf("refusing to connect to non-public address %s "+
+			"(start signet-mcp with --cimd-allow-private-networks to allow this)", ip)
 	}
 	return nil
 }

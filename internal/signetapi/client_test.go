@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 )
@@ -136,5 +137,30 @@ func TestHealthUnhealthy(t *testing.T) {
 	}
 	if status != http.StatusServiceUnavailable || doc["status"] != "unhealthy" {
 		t.Errorf("status=%d doc=%v", status, doc)
+	}
+}
+
+// TestGetJSONRejectsOversizedBody pins the cap behavior: an oversized
+// response fails with an explicit size error, never a confusing truncated
+// JSON parse error.
+func TestGetJSONRejectsOversizedBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(`{"pad":"`)); err != nil {
+			t.Error(err)
+		}
+		pad := strings.Repeat("x", maxResponseBytes)
+		if _, err := w.Write([]byte(pad + `"}`)); err != nil {
+			t.Error(err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	c, err := New(srv.URL, 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.GetJSON(context.Background(), srv.URL+"/big.json")
+	if err == nil || !strings.Contains(err.Error(), "byte cap") {
+		t.Errorf("want explicit size-cap error, got %v", err)
 	}
 }

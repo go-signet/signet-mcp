@@ -131,6 +131,7 @@ claude mcp add --transport http signet https://mcp.example.com
 | `--toolsets`         | `SIGNET_MCP_TOOLSETS`      | `diagnostics,flow` | Enabled toolsets                                  |
 | `--client-id`        | `SIGNET_MCP_CLIENT_ID`     | —                  | Default OAuth client for flow tools               |
 | `--client-secret`    | `SIGNET_MCP_CLIENT_SECRET` | —                  | Default client secret                             |
+| `--cimd-allow-private-networks` | `SIGNET_MCP_CIMD_ALLOW_PRIVATE_NETWORKS` | `false` | Let `signet_validate_cimd` fetch from private/loopback addresses (SSRF guard opt-out) |
 | `--http-timeout`     | —                          | `15s`              | Outbound request timeout                          |
 | `--shutdown-timeout` | —                          | `30s`              | Graceful shutdown window                          |
 | `--log-level`        | `SIGNET_MCP_LOG_LEVEL`     | `info`             | `debug`/`info`/`warn`/`error` (logs go to stderr) |

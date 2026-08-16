@@ -24,6 +24,20 @@ import (
 // maxResponseBytes bounds every response body we read from Signet.
 const maxResponseBytes = 1 << 20 // 1 MiB
 
+// readBody reads a response body under the size cap, failing explicitly when
+// the cap is exceeded instead of silently truncating (which would surface as
+// a misleading JSON parse error).
+func readBody(r io.Reader) ([]byte, error) {
+	body, err := io.ReadAll(io.LimitReader(r, maxResponseBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > maxResponseBytes {
+		return nil, fmt.Errorf("response body exceeds the %d-byte cap", maxResponseBytes)
+	}
+	return body, nil
+}
+
 // Client talks to one Signet server.
 type Client struct {
 	issuer string
@@ -111,7 +125,7 @@ func (c *Client) GetJSON(ctx context.Context, rawURL string) (map[string]any, er
 		return nil, err
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	body, err := readBody(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +198,7 @@ func (c *Client) Health(ctx context.Context) (status int, doc map[string]any, er
 		return 0, nil, err
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	body, err := readBody(resp.Body)
 	if err != nil {
 		return resp.StatusCode, nil, err
 	}
@@ -228,7 +242,7 @@ func (c *Client) PostForm(ctx context.Context, endpoint string, form url.Values,
 		return err
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	body, err := readBody(resp.Body)
 	if err != nil {
 		return err
 	}

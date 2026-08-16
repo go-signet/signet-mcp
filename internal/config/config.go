@@ -45,6 +45,11 @@ type Config struct {
 	// the tool call does not supply its own.
 	ClientID     string
 	ClientSecret string
+	// CIMDAllowPrivate permits signet_validate_cimd to fetch documents from
+	// loopback, private, and link-local addresses. Off by default so the
+	// tool cannot be used as an SSRF proxy into the server's network,
+	// mirroring Signet's CIMD_ALLOW_PRIVATE_NETWORKS.
+	CIMDAllowPrivate bool
 	// HTTPTimeout bounds each outbound request to Signet.
 	HTTPTimeout time.Duration
 	// ShutdownTimeout bounds graceful shutdown.
@@ -94,6 +99,10 @@ func Parse(args []string) (*Config, error) {
 	fs.StringVar(&cfg.ClientSecret, "client-secret",
 		envOr("SIGNET_MCP_CLIENT_SECRET", ""),
 		"default OAuth client_secret (env SIGNET_MCP_CLIENT_SECRET)")
+	fs.BoolVar(&cfg.CIMDAllowPrivate, "cimd-allow-private-networks",
+		envOr("SIGNET_MCP_CIMD_ALLOW_PRIVATE_NETWORKS", "") == "true",
+		"allow signet_validate_cimd to fetch documents from private/loopback addresses "+
+			"(env SIGNET_MCP_CIMD_ALLOW_PRIVATE_NETWORKS=true)")
 	fs.DurationVar(&cfg.HTTPTimeout, "http-timeout", 15*time.Second,
 		"timeout for each outbound request to Signet")
 	fs.DurationVar(&cfg.ShutdownTimeout, "shutdown-timeout", 30*time.Second,

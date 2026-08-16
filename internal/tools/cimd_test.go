@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/go-signet/signet-mcp/internal/config"
@@ -14,7 +16,9 @@ import (
 
 func testDeps(t *testing.T, issuer string) *Deps {
 	t.Helper()
-	cfg := &config.Config{Issuer: issuer, HTTPTimeout: 5_000_000_000}
+	// Tests talk to httptest servers on 127.0.0.1, so the SSRF guard must
+	// be off; TestValidateCIMDBlocksPrivateAddresses covers the guard.
+	cfg := &config.Config{Issuer: issuer, HTTPTimeout: 5_000_000_000, CIMDAllowPrivate: true}
 	api, err := signetapi.New(issuer, cfg.HTTPTimeout)
 	if err != nil {
 		t.Fatal(err)
@@ -164,5 +168,55 @@ func TestValidateCIMDNonJSONContentType(t *testing.T) {
 	}
 	if !sawClientID {
 		t.Error("later checks should still run after a content-type failure")
+	}
+}
+
+// TestValidateCIMDBlocksPrivateAddresses pins the SSRF guard: with the
+// default configuration the tool must refuse to fetch from loopback (and
+// other non-public) addresses without ever sending the request.
+func TestValidateCIMDBlocksPrivateAddresses(t *testing.T) {
+	var served atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		served.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	cfg := &config.Config{Issuer: "https://unused.example.com", HTTPTimeout: 5_000_000_000}
+	api, err := signetapi.New(cfg.Issuer, cfg.HTTPTimeout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := NewDeps(api, cfg, slog.New(slog.DiscardHandler))
+
+	_, out, err := d.validateCIMD(
+		context.Background(),
+		nil,
+		validateCIMDIn{URL: srv.URL + "/client.json"},
+	)
+	if err != nil {
+		t.Fatalf("blocked fetches should be reported via checks, got hard error: %v", err)
+	}
+	if out.Valid {
+		t.Error("Valid must be false when the fetch is refused")
+	}
+	if got := served.Load(); got != 0 {
+		t.Errorf(
+			"the loopback server handled %d requests; the dial guard should refuse before any request is sent",
+			got,
+		)
+	}
+	found := false
+	for _, c := range out.Checks {
+		if c.Name == "fetch" && !c.OK && strings.Contains(c.Detail, "non-public address") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf(
+			"expected a failing fetch check mentioning the non-public address, got %+v",
+			out.Checks,
+		)
 	}
 }

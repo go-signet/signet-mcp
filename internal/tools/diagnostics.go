@@ -70,7 +70,9 @@ func registerDiagnostics(s *mcp.Server, d *Deps) {
 		Name: "signet_validate_cimd",
 		Description: "Fetch a Client ID Metadata Document (CIMD) URL and validate it against the " +
 			"draft-ietf-oauth-client-id-metadata-document / MCP 2026-07-28 rules: https URL without fragment, " +
-			"client_id matching the URL, no client_secret, secretless auth method, valid redirect_uris.",
+			"client_id matching the URL, no client_secret, secretless auth method, valid redirect_uris. " +
+			"Fetches to private, loopback, or link-local addresses are refused unless the server was " +
+			"started with --cimd-allow-private-networks.",
 		Annotations: readOnly("Validate a CIMD document"),
 	}, d.validateCIMD)
 
