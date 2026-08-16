@@ -5,6 +5,10 @@
 *.so
 *.dylib
 bin/
+/signet-mcp
+
+# GoReleaser output
+dist/
 
 # Test binary, built with `go test -c`
 *.test
@@ -22,9 +26,17 @@ go.work.sum
 # env file
 .env
 
+# Logs
+*.log
+
 # local Signet e2e artifacts
 oauth.db
+oauth.db-journal
 signet-credentials.txt
+
+# Editor/IDE
+.idea/
+.vscode/
 
 # macOS
 .DS_Store
