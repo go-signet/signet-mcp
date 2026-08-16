@@ -6,8 +6,9 @@
 #
 # Environment variables:
 #   VERSION      Release version to install (e.g. "v0.1.0"). Defaults to the latest release.
-#   INSTALL_DIR  Directory to install the binary into. Defaults to /usr/local/bin
-#                (falls back to ~/.local/bin when /usr/local/bin is not writable and sudo is unavailable).
+#   INSTALL_DIR  Directory to install the binary into. Defaults to ~/.local/bin
+#                (no sudo required). When the directory is not already in PATH,
+#                the installer appends an export line to the current shell's rc file.
 
 set -eu
 
@@ -90,25 +91,67 @@ tar -xzf "${TMP_DIR}/${ARCHIVE}" -C "$TMP_DIR"
 chmod +x "${TMP_DIR}/${BINARY}"
 
 # --- Install ---
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
-if [ -w "$INSTALL_DIR" ]; then
-  mv "${TMP_DIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
-elif command -v sudo >/dev/null 2>&1; then
-  info "Elevated permissions required to install into ${INSTALL_DIR}"
-  sudo mv "${TMP_DIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
-else
-  INSTALL_DIR="${HOME}/.local/bin"
-  info "No write permission for /usr/local/bin and sudo is unavailable; installing to ${INSTALL_DIR}"
-  mkdir -p "$INSTALL_DIR"
-  mv "${TMP_DIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
-fi
+INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/bin}"
+mkdir -p "$INSTALL_DIR" || error "cannot create ${INSTALL_DIR}"
+[ -w "$INSTALL_DIR" ] || error "no write permission for ${INSTALL_DIR} (set INSTALL_DIR to a writable directory)"
+mv "${TMP_DIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
 
 info "Installed ${BINARY} ${VERSION} to ${INSTALL_DIR}/${BINARY}"
 
 # Older releases may not support --version; ignore failures.
 "${INSTALL_DIR}/${BINARY}" --version 2>/dev/null || true
 
-case ":${PATH}:" in
-  *":${INSTALL_DIR}:"*) : ;;
-  *) printf '\033[1;33mnote:\033[0m %s is not in your PATH. Add it with:\n  export PATH="%s:$PATH"\n' "$INSTALL_DIR" "$INSTALL_DIR" ;;
-esac
+# --- Ensure INSTALL_DIR is in PATH ---
+# Detect the user's login shell (the script itself runs under sh via curl | sh).
+warn() { printf '\033[1;33mnote:\033[0m %s\n' "$1"; }
+
+add_path_to_rc() {
+  RC_FILE="$1"
+  PATH_LINE="$2"
+  # Skip when the rc file already references INSTALL_DIR.
+  if [ -f "$RC_FILE" ] && grep -Fq "$INSTALL_DIR" "$RC_FILE" 2>/dev/null; then
+    info "${RC_FILE} already contains ${INSTALL_DIR}; skipping"
+    return 0
+  fi
+  if ! mkdir -p "$(dirname "$RC_FILE")" 2>/dev/null; then
+    warn "cannot create $(dirname "$RC_FILE"); add ${INSTALL_DIR} to PATH manually:"
+    printf '  %s\n' "$PATH_LINE"
+    return 0
+  fi
+  if ! printf '\n# Added by %s installer\n%s\n' "$BINARY" "$PATH_LINE" >> "$RC_FILE" 2>/dev/null; then
+    warn "cannot write to ${RC_FILE}; add ${INSTALL_DIR} to PATH manually:"
+    printf '  %s\n' "$PATH_LINE"
+    return 0
+  fi
+  info "Added ${INSTALL_DIR} to PATH in ${RC_FILE}"
+  info "Restart your shell or run: source ${RC_FILE}"
+}
+
+# Fixed-string match so glob metacharacters in a user-supplied INSTALL_DIR
+# cannot break the PATH membership check.
+if printf '%s' ":${PATH}:" | grep -Fq ":${INSTALL_DIR}:"; then
+  : # Already in PATH; nothing to do.
+else
+  USER_SHELL="$(basename "${SHELL:-sh}")"
+  case "$USER_SHELL" in
+    zsh)
+      add_path_to_rc "${ZDOTDIR:-$HOME}/.zshrc" "export PATH=\"${INSTALL_DIR}:\$PATH\""
+      ;;
+    bash)
+      # macOS runs interactive bash as a login shell, which reads ~/.bash_profile;
+      # interactive non-login shells (the Linux default) read ~/.bashrc.
+      if [ "$OS" = "darwin" ]; then
+        add_path_to_rc "${HOME}/.bash_profile" "export PATH=\"${INSTALL_DIR}:\$PATH\""
+      else
+        add_path_to_rc "${HOME}/.bashrc" "export PATH=\"${INSTALL_DIR}:\$PATH\""
+      fi
+      ;;
+    fish)
+      add_path_to_rc "${HOME}/.config/fish/config.fish" "fish_add_path -- \"${INSTALL_DIR}\""
+      ;;
+    *)
+      warn "${INSTALL_DIR} is not in your PATH. Add it with:"
+      printf '  export PATH="%s:$PATH"\n' "$INSTALL_DIR"
+      ;;
+  esac
+fi

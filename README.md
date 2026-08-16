@@ -57,9 +57,9 @@ clients can gate confirmation.
 
 Downloads the latest release binary for your OS/arch (Linux/macOS,
 amd64/arm64), verifies its SHA256 checksum, and installs it to
-`/usr/local/bin` (using `sudo` when needed; falls back to
-`~/.local/bin` when `/usr/local/bin` is not writable and `sudo` is
-unavailable):
+`~/.local/bin` — no `sudo` required. If that directory is not in your
+`PATH`, the script adds it to your shell's rc file (`~/.zshrc`,
+`~/.bashrc` / `~/.bash_profile`, or fish's `config.fish`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/go-signet/signet-mcp/main/install.sh | sh
@@ -71,8 +71,8 @@ Options via environment variables:
 # Pin a specific release
 curl -fsSL https://raw.githubusercontent.com/go-signet/signet-mcp/main/install.sh | VERSION=v0.1.0 sh
 
-# Install somewhere else (no sudo needed)
-curl -fsSL https://raw.githubusercontent.com/go-signet/signet-mcp/main/install.sh | INSTALL_DIR="$HOME/.local/bin" sh
+# Install somewhere else (must be writable by the current user)
+curl -fsSL https://raw.githubusercontent.com/go-signet/signet-mcp/main/install.sh | INSTALL_DIR="$HOME/bin" sh
 ```
 
 Verify the installed version:
