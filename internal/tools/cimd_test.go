@@ -121,3 +121,48 @@ func TestValidateCIMDFetchFailure(t *testing.T) {
 		t.Error("Valid should be false on a 404")
 	}
 }
+
+// TestValidateCIMDNonJSONContentType asserts a non-JSON Content-Type is a
+// failing check that invalidates the result, while the rest of the document
+// is still validated for a complete diagnostic report.
+func TestValidateCIMDNonJSONContentType(t *testing.T) {
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		doc := map[string]any{
+			"client_id":     srv.URL + r.URL.Path,
+			"redirect_uris": []string{"https://client.example.com/callback"},
+		}
+		if err := json.NewEncoder(w).Encode(doc); err != nil {
+			t.Error(err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	d := testDeps(t, "https://unused.example.com")
+	_, out, err := d.validateCIMD(
+		context.Background(),
+		nil,
+		validateCIMDIn{URL: srv.URL + "/client.json"},
+	)
+	if err != nil {
+		t.Fatalf("validateCIMD: %v", err)
+	}
+	if out.Valid {
+		t.Error("Valid must be false when Content-Type is not application/json")
+	}
+	sawContentType, sawClientID := false, false
+	for _, c := range out.Checks {
+		if c.Name == "content_type" && !c.OK {
+			sawContentType = true
+		}
+		if c.Name == "client_id_matches_url" && c.OK {
+			sawClientID = true
+		}
+	}
+	if !sawContentType {
+		t.Error("content_type check should be present and failing")
+	}
+	if !sawClientID {
+		t.Error("later checks should still run after a content-type failure")
+	}
+}
