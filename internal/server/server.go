@@ -131,6 +131,12 @@ func (s *Server) HTTPServer(ctx context.Context) (*http.Server, error) {
 	)
 
 	mux := http.NewServeMux()
+	// Unauthenticated liveness probe for container orchestrators.
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
 	mux.Handle("/.well-known/oauth-protected-resource", prm)
 	mux.Handle("/.well-known/oauth-protected-resource/", prm)
 	mux.Handle("/", requireToken(mcpHandler))

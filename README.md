@@ -120,6 +120,34 @@ Code:
 claude mcp add --transport http signet https://mcp.example.com
 ```
 
+#### Docker (remote HTTP)
+
+Multi-arch images (`linux/amd64`, `linux/arm64`) are published to GHCR on
+every push to `main` (`latest`) and on version tags. The image defaults to
+`SIGNET_MCP_TRANSPORT=http` and `SIGNET_MCP_ADDR=:8090`, and ships a
+`HEALTHCHECK` against the unauthenticated `/healthz` endpoint.
+
+```bash
+docker run -d --name signet-mcp -p 8090:8090 \
+  -e SIGNET_MCP_ISSUER=https://auth.example.com \
+  -e SIGNET_MCP_PUBLIC_URL=https://mcp.example.com \
+  ghcr.io/go-signet/signet-mcp:latest
+```
+
+Or with Docker Compose:
+
+```yaml
+services:
+  signet-mcp:
+    image: ghcr.io/go-signet/signet-mcp:latest
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      SIGNET_MCP_ISSUER: https://auth.example.com
+      SIGNET_MCP_PUBLIC_URL: https://mcp.example.com
+```
+
 ### Configuration
 
 | Flag                            | Env                                      | Default            |                                                                                       |

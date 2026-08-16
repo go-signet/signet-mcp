@@ -7,6 +7,14 @@ LDFLAGS := -s -w -X github.com/go-signet/signet-mcp/internal/server.Version=$(VE
 build:
 	$(GO) build -ldflags '$(LDFLAGS)' -o bin/$(BINARY) .
 
+## build_linux_amd64: build the signet-mcp binary for linux amd64
+build_linux_amd64:
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -ldflags '$(LDFLAGS)' -o release/linux/amd64/$(BINARY) .
+
+## build_linux_arm64: build the signet-mcp binary for linux arm64
+build_linux_arm64:
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GO) build -ldflags '$(LDFLAGS)' -o release/linux/arm64/$(BINARY) .
+
 ## test: run tests
 test:
 	@$(GO) test -v -cover -coverprofile coverage.txt ./... && echo "\n==>\033[32m Ok\033[m\n" || exit 1
@@ -29,7 +37,7 @@ lint: install-golangci-lint
 
 ## clean: remove build and test artifacts
 clean:
-	rm -rf bin coverage.txt
+	rm -rf bin release coverage.txt
 
 ## mod-download: download go module dependencies
 mod-download:
@@ -53,5 +61,5 @@ help:
 	@echo 'Usage:'
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' | sed -e 's/^/ /'
 
-.PHONY: help build test coverage fmt lint clean
+.PHONY: help build build_linux_amd64 build_linux_arm64 test coverage fmt lint clean
 .PHONY: install-golangci-lint mod-download mod-tidy mod-verify check-tools
