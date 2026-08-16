@@ -53,11 +53,40 @@ clients can gate confirmation.
 
 ## Install
 
+### Install script (recommended)
+
+Downloads the latest release binary for your OS/arch (Linux/macOS,
+amd64/arm64), verifies its SHA256 checksum, and installs it to
+`/usr/local/bin`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/go-signet/signet-mcp/main/install.sh | sh
+```
+
+Options via environment variables:
+
+```bash
+# Pin a specific release
+curl -fsSL https://raw.githubusercontent.com/go-signet/signet-mcp/main/install.sh | VERSION=v0.1.0 sh
+
+# Install somewhere else (no sudo needed)
+curl -fsSL https://raw.githubusercontent.com/go-signet/signet-mcp/main/install.sh | INSTALL_DIR="$HOME/.local/bin" sh
+```
+
+Verify the installed version:
+
+```bash
+signet-mcp --version
+```
+
+### go install
+
 ```bash
 go install github.com/go-signet/signet-mcp@latest
 ```
 
-Or grab a release binary from the releases page.
+Or grab a release binary from the
+[releases page](https://github.com/go-signet/signet-mcp/releases).
 
 ## Usage
 
@@ -164,6 +193,7 @@ services:
 | `--shutdown-timeout`            | —                                        | `30s`              | Graceful shutdown window                                                              |
 | `--log-level`                   | `SIGNET_MCP_LOG_LEVEL`                   | `info`             | `debug`/`info`/`warn`/`error` (logs go to stderr)                                     |
 | `--log-json`                    | —                                        | `false`            | JSON log output                                                                       |
+| `--version`                     | —                                        | —                  | Print version and exit                                                                |
 
 Shutdown is graceful: SIGINT/SIGTERM drains in-flight tool calls and the
 HTTP listener within `--shutdown-timeout`.

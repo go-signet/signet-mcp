@@ -26,6 +26,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "signet-mcp:", err)
 		os.Exit(2)
 	}
+	if cfg.ShowVersion {
+		fmt.Println("signet-mcp version", server.Version)
+		return
+	}
 	if err := run(cfg); err != nil {
 		fmt.Fprintln(os.Stderr, "signet-mcp:", err)
 		os.Exit(1)
