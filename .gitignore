@@ -10,6 +10,9 @@ bin/
 # GoReleaser output
 dist/
 
+# Cross-compiled binaries for Docker builds
+release/
+
 # Test binary, built with `go test -c`
 *.test
 

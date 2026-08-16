@@ -2,7 +2,10 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -68,6 +71,61 @@ func TestToolRegistration(t *testing.T) {
 	if a := byName["signet_revoke_token"].Annotations; a == nil || a.ReadOnlyHint ||
 		a.DestructiveHint == nil || *a.DestructiveHint || !a.IdempotentHint {
 		t.Error("signet_revoke_token should be a non-destructive idempotent write")
+	}
+}
+
+// TestHTTPServerHealthz pins the container liveness contract: /healthz
+// answers 200 without a token while the MCP endpoint stays behind auth.
+func TestHTTPServerHealthz(t *testing.T) {
+	var issuer string
+	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/.well-known/openid-configuration":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"issuer":                 issuer,
+				"jwks_uri":               issuer + "/jwks",
+				"authorization_endpoint": issuer + "/authorize",
+				"token_endpoint":         issuer + "/token",
+			})
+		case "/jwks":
+			_, _ = w.Write([]byte(`{"keys":[]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer fake.Close()
+	issuer = fake.URL
+
+	cfg := &config.Config{
+		Issuer:      fake.URL,
+		Transport:   config.TransportHTTP,
+		Addr:        "localhost:0",
+		PublicURL:   "http://localhost:8090",
+		Toolsets:    config.DefaultToolsets,
+		HTTPTimeout: 5 * time.Second,
+	}
+	srv, err := New(cfg, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	httpSrv, err := srv.HTTPServer(context.Background())
+	if err != nil {
+		t.Fatalf("HTTPServer: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	httpSrv.Handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if rr.Code != http.StatusOK {
+		t.Errorf("GET /healthz = %d, want %d", rr.Code, http.StatusOK)
+	}
+	if got := rr.Body.String(); got != "ok" {
+		t.Errorf("GET /healthz body = %q, want %q", got, "ok")
+	}
+
+	rr = httptest.NewRecorder()
+	httpSrv.Handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/", nil))
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("unauthenticated POST / = %d, want %d", rr.Code, http.StatusUnauthorized)
 	}
 }
 
