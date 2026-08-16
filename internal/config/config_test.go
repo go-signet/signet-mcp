@@ -44,6 +44,16 @@ func TestParseUnknownTransport(t *testing.T) {
 	}
 }
 
+func TestParseVersionFlag(t *testing.T) {
+	cfg, err := Parse([]string{"--version"})
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if !cfg.ShowVersion {
+		t.Error("ShowVersion = false, want true")
+	}
+}
+
 func TestParseHTTPDefaultsPublicURL(t *testing.T) {
 	cfg, err := Parse(
 		[]string{

@@ -58,6 +58,9 @@ type Config struct {
 	LogLevel string
 	// LogJSON switches slog to JSON output.
 	LogJSON bool
+	// ShowVersion is set by --version; the caller should print the version
+	// and exit instead of starting the server.
+	ShowVersion bool
 }
 
 // envOr returns the environment variable value or a default.
@@ -111,9 +114,13 @@ func Parse(args []string) (*Config, error) {
 		envOr("SIGNET_MCP_LOG_LEVEL", "info"),
 		"log level: debug, info, warn, error (env SIGNET_MCP_LOG_LEVEL)")
 	fs.BoolVar(&cfg.LogJSON, "log-json", false, "emit logs as JSON")
+	fs.BoolVar(&cfg.ShowVersion, "version", false, "print version and exit")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
+	}
+	if cfg.ShowVersion {
+		return cfg, nil
 	}
 	for t := range strings.SplitSeq(toolsets, ",") {
 		if t = strings.TrimSpace(t); t != "" {
