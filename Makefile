@@ -7,7 +7,7 @@ LDFLAGS := -s -w -X github.com/go-signet/signet-mcp/internal/server.Version=$(VE
 build:
 	$(GO) build -ldflags '$(LDFLAGS)' -o bin/$(BINARY) .
 
-## test: run tests (set SIGNET_E2E=1 to include the e2e suite against a local Signet)
+## test: run tests
 test:
 	@$(GO) test -v -cover -coverprofile coverage.txt ./... && echo "\n==>\033[32m Ok\033[m\n" || exit 1
 

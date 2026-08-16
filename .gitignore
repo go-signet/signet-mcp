@@ -29,6 +29,10 @@ go.work.sum
 # Logs
 *.log
 
+# local-only development artifacts (depend on a sibling signet checkout)
+/e2e/
+/plan.md
+
 # local Signet e2e artifacts
 oauth.db
 oauth.db-journal
