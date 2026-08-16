@@ -105,7 +105,7 @@ fi
 
 info "Installed ${BINARY} ${VERSION} to ${INSTALL_DIR}/${BINARY}"
 
-# Releases prior to v0.2.0 do not support --version; ignore failures.
+# Older releases may not support --version; ignore failures.
 "${INSTALL_DIR}/${BINARY}" --version 2>/dev/null || true
 
 case ":${PATH}:" in

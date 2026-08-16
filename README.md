@@ -57,7 +57,9 @@ clients can gate confirmation.
 
 Downloads the latest release binary for your OS/arch (Linux/macOS,
 amd64/arm64), verifies its SHA256 checksum, and installs it to
-`/usr/local/bin`:
+`/usr/local/bin` (using `sudo` when needed; falls back to
+`~/.local/bin` when `/usr/local/bin` is not writable and `sudo` is
+unavailable):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/go-signet/signet-mcp/main/install.sh | sh
