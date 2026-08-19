@@ -50,6 +50,24 @@ fi
 # Strip the leading "v" for archive file names (goreleaser convention).
 VERSION_NUM="${VERSION#v}"
 
+# --- Skip when the requested version is already installed ---
+INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/bin}"
+INSTALLED_BIN=""
+if [ -x "${INSTALL_DIR}/${BINARY}" ]; then
+  INSTALLED_BIN="${INSTALL_DIR}/${BINARY}"
+elif command -v "$BINARY" >/dev/null 2>&1; then
+  INSTALLED_BIN="$(command -v "$BINARY")"
+fi
+if [ -n "$INSTALLED_BIN" ]; then
+  # Output format: "signet-mcp version X.Y.Z" (older releases may not
+  # support --version; treat failures as version unknown).
+  INSTALLED_VERSION="$("$INSTALLED_BIN" --version 2>/dev/null | awk '{print $NF}')" || INSTALLED_VERSION=""
+  if [ "${INSTALLED_VERSION#v}" = "$VERSION_NUM" ]; then
+    info "${BINARY} ${VERSION} is already installed at ${INSTALLED_BIN}; nothing to do"
+    exit 0
+  fi
+fi
+
 ARCHIVE="${BINARY}_${VERSION_NUM}_${OS}_${ARCH}.tar.gz"
 CHECKSUMS="${BINARY}_${VERSION_NUM}_checksums.txt"
 DOWNLOAD_URL="${GITHUB}/releases/download/${VERSION}/${ARCHIVE}"
@@ -91,7 +109,6 @@ tar -xzf "${TMP_DIR}/${ARCHIVE}" -C "$TMP_DIR"
 chmod +x "${TMP_DIR}/${BINARY}"
 
 # --- Install ---
-INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/bin}"
 mkdir -p "$INSTALL_DIR" || error "cannot create ${INSTALL_DIR}"
 [ -w "$INSTALL_DIR" ] || error "no write permission for ${INSTALL_DIR} (set INSTALL_DIR to a writable directory)"
 mv "${TMP_DIR}/${BINARY}" "${INSTALL_DIR}/${BINARY}"
