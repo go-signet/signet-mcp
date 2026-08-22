@@ -139,7 +139,12 @@ signet-mcp --issuer https://auth.example.com \
   --public-url https://mcp.example.com
 ```
 
-Clients then obtain tokens with `resource=https://mcp.example.com`.
+Clients then obtain tokens with `resource=https://mcp.example.com`. A
+trailing slash is tolerated in `aud` (`https://mcp.example.com/`), since MCP
+clients derive the `resource` they request from `new URL(serverUrl).href`,
+which appends one to a bare origin. Remember to allowlist the same value
+on the Signet side (`CIMD_ALLOWED_RESOURCES` for CIMD clients such as
+Claude, or the client's Allowed Resources otherwise).
 
 #### claude.ai / Claude Code (remote)
 
