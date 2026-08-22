@@ -134,7 +134,8 @@ func (d *Deps) deviceFlowStart(
 		)
 	}
 	da, err := d.API.DeviceCodeRequest(
-		ctx, clientID, clientSecret, in.Scopes, resourceList(in.Resource))
+		ctx, clientID, clientSecret, in.Scopes, resourceList(in.Resource),
+	)
 	if err != nil {
 		return nil, deviceStartOut{}, explainOAuthError("device authorization", err)
 	}
