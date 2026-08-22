@@ -2,13 +2,18 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/go-signet/signet-mcp/internal/config"
@@ -75,7 +80,8 @@ func TestToolRegistration(t *testing.T) {
 }
 
 // TestHTTPServerHealthz pins the container liveness contract: /healthz
-// answers 200 without a token while the MCP endpoint stays behind auth.
+// answers 200 without a token, the MCP endpoint at /mcp stays behind auth,
+// and the root is no longer a catch-all for the MCP handler.
 func TestHTTPServerHealthz(t *testing.T) {
 	var issuer string
 	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -123,9 +129,16 @@ func TestHTTPServerHealthz(t *testing.T) {
 	}
 
 	rr = httptest.NewRecorder()
-	httpSrv.Handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/", nil))
+	httpSrv.Handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/mcp", nil))
 	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("unauthenticated POST / = %d, want %d", rr.Code, http.StatusUnauthorized)
+		t.Errorf("unauthenticated POST /mcp = %d, want %d", rr.Code, http.StatusUnauthorized)
+	}
+
+	rr = httptest.NewRecorder()
+	httpSrv.Handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/", nil))
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("POST / = %d, want %d (root is no longer the MCP endpoint)",
+			rr.Code, http.StatusNotFound)
 	}
 }
 
@@ -163,6 +176,163 @@ func TestDiagnosticsOnlyToolset(t *testing.T) {
 	for _, tool := range res.Tools {
 		if tool.Name == "signet_device_flow_start" {
 			t.Error("flow toolset leaked into a diagnostics-only session")
+		}
+	}
+}
+
+// fakeIssuer is an OIDC issuer stub with a real RSA JWKS so the offline
+// verifier can validate tokens minted by sign.
+type fakeIssuer struct {
+	srv *httptest.Server
+	key *rsa.PrivateKey
+}
+
+func newFakeIssuer(t *testing.T) *fakeIssuer {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("rsa.GenerateKey: %v", err)
+	}
+	fi := &fakeIssuer{key: key}
+	fi.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/.well-known/openid-configuration":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"issuer":                 fi.srv.URL,
+				"jwks_uri":               fi.srv.URL + "/jwks",
+				"authorization_endpoint": fi.srv.URL + "/authorize",
+				"token_endpoint":         fi.srv.URL + "/token",
+			})
+		case "/jwks":
+			_ = json.NewEncoder(w).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{
+				Key: &key.PublicKey, KeyID: "test", Algorithm: "RS256", Use: "sig",
+			}}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(fi.srv.Close)
+	return fi
+}
+
+// sign mints an RS256 JWT from this issuer with the given aud and Signet
+// token type. aud == nil omits the claim entirely.
+func (fi *fakeIssuer) sign(t *testing.T, aud []string, typ string) string {
+	t.Helper()
+	signer, err := jose.NewSigner(
+		jose.SigningKey{Algorithm: jose.RS256, Key: fi.key},
+		(&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", "test"),
+	)
+	if err != nil {
+		t.Fatalf("jose.NewSigner: %v", err)
+	}
+	now := time.Now()
+	claims := map[string]any{
+		"iss":   fi.srv.URL,
+		"sub":   "user-1",
+		"uid":   "user-1",
+		"iat":   now.Unix(),
+		"exp":   now.Add(time.Hour).Unix(),
+		"type":  typ,
+		"scope": "openid",
+	}
+	if aud != nil {
+		claims["aud"] = aud
+	}
+	raw, err := jwt.Signed(signer).Claims(claims).Serialize()
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	return raw
+}
+
+// TestHTTPServerAudience pins the RFC 8707 audience contract, including the
+// trailing-slash tolerance: MCP clients request resource=new URL(serverUrl).href,
+// which appends a trailing slash if the URL they connect to has no path, and
+// the token they come back with must still be accepted.
+func TestHTTPServerAudience(t *testing.T) {
+	fi := newFakeIssuer(t)
+	const publicURL = "http://localhost:8090"
+	const resource = publicURL + "/mcp"
+
+	cfg := &config.Config{
+		Issuer:      fi.srv.URL,
+		Transport:   config.TransportHTTP,
+		Addr:        "localhost:0",
+		PublicURL:   publicURL,
+		Toolsets:    config.DefaultToolsets,
+		HTTPTimeout: 5 * time.Second,
+	}
+	srv, err := New(cfg, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	httpSrv, err := srv.HTTPServer(context.Background())
+	if err != nil {
+		t.Fatalf("HTTPServer: %v", err)
+	}
+
+	const initBody = `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{` +
+		`"protocolVersion":"2025-06-18","capabilities":{},` +
+		`"clientInfo":{"name":"test","version":"0"}}}`
+
+	tests := []struct {
+		name     string
+		aud      []string
+		typ      string
+		wantAuth bool
+	}{
+		{"exact", []string{resource}, "access", true},
+		{"trailing slash", []string{resource + "/"}, "access", true},
+		{"multi-valued", []string{"https://other.example", resource + "/"}, "access", true},
+		{"other resource", []string{"http://localhost:8091/mcp"}, "access", false},
+		{"bare origin only", []string{publicURL}, "access", false},
+		{"missing aud", nil, "access", false},
+		{"refresh token", []string{resource}, "refresh", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(initBody))
+			req.Header.Set("Authorization", "Bearer "+fi.sign(t, tt.aud, tt.typ))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Accept", "application/json, text/event-stream")
+			rr := httptest.NewRecorder()
+			httpSrv.Handler.ServeHTTP(rr, req)
+
+			if tt.wantAuth && rr.Code == http.StatusUnauthorized {
+				t.Fatalf("aud %v rejected: %d %s", tt.aud, rr.Code, rr.Body.String())
+			}
+			if !tt.wantAuth && rr.Code != http.StatusUnauthorized {
+				t.Fatalf("aud %v type %q accepted: %d %s",
+					tt.aud, tt.typ, rr.Code, rr.Body.String())
+			}
+			if tt.wantAuth && rr.Code != http.StatusOK {
+				t.Fatalf("initialize = %d, want 200: %s", rr.Code, rr.Body.String())
+			}
+		})
+	}
+}
+
+func TestAudienceAllowed(t *testing.T) {
+	tests := []struct {
+		aud      []string
+		resource string
+		want     bool
+	}{
+		{[]string{"http://h:1"}, "http://h:1", true},
+		{[]string{"http://h:1/"}, "http://h:1", true},
+		{[]string{"http://h:1"}, "http://h:1/", true},
+		{[]string{"http://h:1/mcp"}, "http://h:1/mcp/", true},
+		{[]string{"x", "http://h:1"}, "http://h:1", true},
+		{[]string{"http://h:1//"}, "http://h:1", false},
+		{[]string{"http://h:1/mcp"}, "http://h:1", false},
+		{[]string{"http://h:10"}, "http://h:1", false},
+		{nil, "http://h:1", false},
+		{[]string{""}, "", true},
+	}
+	for _, tt := range tests {
+		if got := audienceAllowed(tt.aud, tt.resource); got != tt.want {
+			t.Errorf("audienceAllowed(%v, %q) = %v, want %v", tt.aud, tt.resource, got, tt.want)
 		}
 	}
 }

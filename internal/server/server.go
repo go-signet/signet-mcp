@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/auth"
@@ -105,15 +106,28 @@ func (s *Server) RunStdio(ctx context.Context) error {
 // must carry this server's resource identifier in aud (RFC 8707), and must
 // be access tokens (type == "access"). RFC 9728 protected-resource metadata
 // is served on the well-known path, and 401 responses point at it.
+//
+// The MCP endpoint is served at "/mcp" rather than at the root, so that the
+// resource identifier always has a path component. A bare-origin
+// --public-url has an empty path, which MCP clients that derive resource
+// from new URL(serverUrl).href normalise by appending a trailing slash —
+// the very mismatch audienceAllowed tolerates below. Giving the endpoint (and
+// therefore the resource identifier) a path sidesteps that normalisation,
+// and leaves "/" free for future non-MCP use.
+//
+// The audience check is done in bearerVerifier rather than by the sdk-go
+// verifier so that a trailing-slash variant of the resource is still
+// accepted — see audienceAllowed.
 func (s *Server) HTTPServer(ctx context.Context) (*http.Server, error) {
-	verifier, err := jwksauth.NewVerifier(ctx, s.cfg.Issuer, s.cfg.PublicURL)
+	verifier, err := jwksauth.NewVerifierSkipAudience(ctx, s.cfg.Issuer)
 	if err != nil {
 		return nil, fmt.Errorf("building JWKS verifier for %s: %w", s.cfg.Issuer, err)
 	}
 
+	resource := s.cfg.PublicURL + "/mcp"
 	prmURL := s.cfg.PublicURL + "/.well-known/oauth-protected-resource"
 	prm := auth.ProtectedResourceMetadataHandler(&oauthex.ProtectedResourceMetadata{
-		Resource:               s.cfg.PublicURL,
+		Resource:               resource,
 		AuthorizationServers:   []string{s.cfg.Issuer},
 		BearerMethodsSupported: []string{"header"},
 		ResourceName:           "signet-mcp",
@@ -124,7 +138,7 @@ func (s *Server) HTTPServer(ctx context.Context) (*http.Server, error) {
 		&mcp.StreamableHTTPOptions{Logger: s.log},
 	)
 	requireToken := auth.RequireBearerToken(
-		bearerVerifier(verifier),
+		bearerVerifier(verifier, resource),
 		&auth.RequireBearerTokenOptions{
 			ResourceMetadataURL: prmURL,
 		},
@@ -139,11 +153,11 @@ func (s *Server) HTTPServer(ctx context.Context) (*http.Server, error) {
 	})
 	mux.Handle("/.well-known/oauth-protected-resource", prm)
 	mux.Handle("/.well-known/oauth-protected-resource/", prm)
-	mux.Handle("/", requireToken(mcpHandler))
+	mux.Handle("/mcp", requireToken(mcpHandler))
 
 	s.log.Info("serving MCP over streamable HTTP",
 		slog.String("addr", s.cfg.Addr),
-		slog.String("resource", s.cfg.PublicURL),
+		slog.String("resource", resource),
 		slog.String("issuer", s.cfg.Issuer),
 	)
 	return &http.Server{
@@ -154,12 +168,21 @@ func (s *Server) HTTPServer(ctx context.Context) (*http.Server, error) {
 }
 
 // bearerVerifier adapts the sdk-go offline verifier to the MCP SDK's
-// middleware contract, adding the Signet type == "access" check.
-func bearerVerifier(v *jwksauth.Verifier) auth.TokenVerifier {
+// middleware contract, adding the RFC 8707 audience check against resource
+// and the Signet type == "access" check.
+func bearerVerifier(v *jwksauth.Verifier, resource string) auth.TokenVerifier {
 	return func(ctx context.Context, token string, _ *http.Request) (*auth.TokenInfo, error) {
 		info, err := v.Verify(ctx, token)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %v", auth.ErrInvalidToken, err)
+		}
+		if !audienceAllowed(info.Audience, resource) {
+			return nil, fmt.Errorf(
+				"%w: audience %q does not include resource %q",
+				auth.ErrInvalidToken,
+				info.Audience,
+				resource,
+			)
 		}
 		var tc struct {
 			Type string `json:"type"`
@@ -180,4 +203,21 @@ func bearerVerifier(v *jwksauth.Verifier) auth.TokenVerifier {
 			UserID:     info.Claims.UID,
 		}, nil
 	}
+}
+
+// audienceAllowed reports whether aud names resource, ignoring a single
+// trailing slash on either side. RFC 8707 resource indicators are compared
+// as strings, but MCP clients derive the `resource` they request from
+// new URL(serverUrl).href, which normalises a bare origin such as
+// http://localhost:8090 to http://localhost:8090/ — so the token's aud can
+// legitimately carry the slash while the configured public URL does not.
+// An empty aud never matches.
+func audienceAllowed(aud []string, resource string) bool {
+	want := strings.TrimSuffix(resource, "/")
+	for _, a := range aud {
+		if strings.TrimSuffix(a, "/") == want {
+			return true
+		}
+	}
+	return false
 }
