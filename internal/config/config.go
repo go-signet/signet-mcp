@@ -35,8 +35,9 @@ type Config struct {
 	// Addr is the listen address for the HTTP transport.
 	Addr string
 	// PublicURL is the externally reachable base URL of this MCP server in
-	// HTTP mode. It doubles as the RFC 8707 resource identifier that access
-	// tokens must carry in their audience.
+	// HTTP mode. The MCP endpoint is served at PublicURL + "/mcp", which
+	// also doubles as the RFC 8707 resource identifier that access tokens
+	// must carry in their audience.
 	PublicURL string
 	// Toolsets lists the enabled toolsets.
 	Toolsets []string
@@ -91,7 +92,8 @@ func Parse(args []string) (*Config, error) {
 		&cfg.PublicURL,
 		"public-url",
 		envOr("SIGNET_MCP_PUBLIC_URL", ""),
-		"externally reachable base URL in http mode; used as the RFC 8707 resource identifier (env SIGNET_MCP_PUBLIC_URL)",
+		"externally reachable base URL in http mode; the MCP endpoint is <public-url>/mcp, "+
+			"the RFC 8707 resource identifier (env SIGNET_MCP_PUBLIC_URL)",
 	)
 	fs.StringVar(&toolsets, "toolsets",
 		envOr("SIGNET_MCP_TOOLSETS", strings.Join(DefaultToolsets, ",")),

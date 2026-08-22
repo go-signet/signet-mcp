@@ -128,10 +128,11 @@ Or in `.mcp.json`:
 In HTTP mode signet-mcp dogfoods Signet: it acts as an OAuth resource
 server protected by the very Signet it serves tools for. Bearer tokens
 are verified offline against Signet's JWKS, must be access tokens
-(`type == "access"`), and must carry this server's public URL in their
-audience (RFC 8707). RFC 9728 protected-resource metadata is served at
-`/.well-known/oauth-protected-resource`, and `401` responses point to it
-so MCP clients can discover the authorization server automatically.
+(`type == "access"`), and must carry this server's MCP endpoint URL in
+their audience (RFC 8707). The MCP endpoint is served at `/mcp` (not the
+root, which is left free), RFC 9728 protected-resource metadata is served
+at `/.well-known/oauth-protected-resource`, and `401` responses point to
+it so MCP clients can discover the authorization server automatically.
 
 ```bash
 signet-mcp --issuer https://auth.example.com \
@@ -139,21 +140,22 @@ signet-mcp --issuer https://auth.example.com \
   --public-url https://mcp.example.com
 ```
 
-Clients then obtain tokens with `resource=https://mcp.example.com`. A
-trailing slash is tolerated in `aud` (`https://mcp.example.com/`), since MCP
-clients derive the `resource` they request from `new URL(serverUrl).href`,
-which appends one to a bare origin. Remember to allowlist the same value
-on the Signet side (`CIMD_ALLOWED_RESOURCES` for CIMD clients such as
-Claude, or the client's Allowed Resources otherwise).
+Clients then connect to `https://mcp.example.com/mcp` and obtain tokens
+with `resource=https://mcp.example.com/mcp`. A trailing slash is
+tolerated in `aud` (`https://mcp.example.com/mcp/`), since MCP clients
+derive the `resource` they request from `new URL(serverUrl).href`. Remember
+to allowlist the same value on the Signet side (`CIMD_ALLOWED_RESOURCES`
+for CIMD clients such as Claude, or the client's Allowed Resources
+otherwise).
 
 #### claude.ai / Claude Code (remote)
 
-Add a custom connector with URL `https://mcp.example.com` — the OAuth
+Add a custom connector with URL `https://mcp.example.com/mcp` — the OAuth
 flow is discovered from the protected-resource metadata. From Claude
 Code:
 
 ```bash
-claude mcp add --transport http signet https://mcp.example.com
+claude mcp add --transport http signet https://mcp.example.com/mcp
 ```
 
 #### Docker (remote HTTP)
@@ -191,7 +193,7 @@ services:
 | `--issuer`                      | `SIGNET_MCP_ISSUER`                      | —                  | Signet issuer URL (required)                                                          |
 | `--transport`                   | `SIGNET_MCP_TRANSPORT`                   | `stdio`            | `stdio` or `http`                                                                     |
 | `--addr`                        | `SIGNET_MCP_ADDR`                        | `localhost:8090`   | HTTP listen address                                                                   |
-| `--public-url`                  | `SIGNET_MCP_PUBLIC_URL`                  | `http://<addr>`    | External base URL = RFC 8707 resource identifier                                      |
+| `--public-url`                  | `SIGNET_MCP_PUBLIC_URL`                  | `http://<addr>`    | External base URL; MCP endpoint is `<public-url>/mcp`, the RFC 8707 resource identifier |
 | `--toolsets`                    | `SIGNET_MCP_TOOLSETS`                    | `diagnostics,flow` | Enabled toolsets                                                                      |
 | `--client-id`                   | `SIGNET_MCP_CLIENT_ID`                   | —                  | Default OAuth client for flow tools                                                   |
 | `--client-secret`               | `SIGNET_MCP_CLIENT_SECRET`               | —                  | Default client secret                                                                 |

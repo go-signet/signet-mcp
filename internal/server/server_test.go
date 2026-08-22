@@ -80,7 +80,8 @@ func TestToolRegistration(t *testing.T) {
 }
 
 // TestHTTPServerHealthz pins the container liveness contract: /healthz
-// answers 200 without a token while the MCP endpoint stays behind auth.
+// answers 200 without a token, the MCP endpoint at /mcp stays behind auth,
+// and the root is no longer a catch-all for the MCP handler.
 func TestHTTPServerHealthz(t *testing.T) {
 	var issuer string
 	fake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -128,9 +129,16 @@ func TestHTTPServerHealthz(t *testing.T) {
 	}
 
 	rr = httptest.NewRecorder()
-	httpSrv.Handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/", nil))
+	httpSrv.Handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/mcp", nil))
 	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("unauthenticated POST / = %d, want %d", rr.Code, http.StatusUnauthorized)
+		t.Errorf("unauthenticated POST /mcp = %d, want %d", rr.Code, http.StatusUnauthorized)
+	}
+
+	rr = httptest.NewRecorder()
+	httpSrv.Handler.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/", nil))
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("POST / = %d, want %d (root is no longer the MCP endpoint)",
+			rr.Code, http.StatusNotFound)
 	}
 }
 
@@ -240,11 +248,12 @@ func (fi *fakeIssuer) sign(t *testing.T, aud []string, typ string) string {
 
 // TestHTTPServerAudience pins the RFC 8707 audience contract, including the
 // trailing-slash tolerance: MCP clients request resource=new URL(serverUrl).href,
-// which turns a bare-origin public URL into one ending in "/", and the token
-// they come back with must still be accepted.
+// which appends a trailing slash if the URL they connect to has no path, and
+// the token they come back with must still be accepted.
 func TestHTTPServerAudience(t *testing.T) {
 	fi := newFakeIssuer(t)
 	const publicURL = "http://localhost:8090"
+	const resource = publicURL + "/mcp"
 
 	cfg := &config.Config{
 		Issuer:      fi.srv.URL,
@@ -273,17 +282,17 @@ func TestHTTPServerAudience(t *testing.T) {
 		typ      string
 		wantAuth bool
 	}{
-		{"exact", []string{publicURL}, "access", true},
-		{"trailing slash", []string{publicURL + "/"}, "access", true},
-		{"multi-valued", []string{"https://other.example", publicURL + "/"}, "access", true},
-		{"other resource", []string{"http://localhost:8091"}, "access", false},
-		{"prefix only", []string{publicURL + "/mcp"}, "access", false},
+		{"exact", []string{resource}, "access", true},
+		{"trailing slash", []string{resource + "/"}, "access", true},
+		{"multi-valued", []string{"https://other.example", resource + "/"}, "access", true},
+		{"other resource", []string{"http://localhost:8091/mcp"}, "access", false},
+		{"bare origin only", []string{publicURL}, "access", false},
 		{"missing aud", nil, "access", false},
-		{"refresh token", []string{publicURL}, "refresh", false},
+		{"refresh token", []string{resource}, "refresh", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(initBody))
+			req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(initBody))
 			req.Header.Set("Authorization", "Bearer "+fi.sign(t, tt.aud, tt.typ))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Accept", "application/json, text/event-stream")

@@ -107,18 +107,27 @@ func (s *Server) RunStdio(ctx context.Context) error {
 // be access tokens (type == "access"). RFC 9728 protected-resource metadata
 // is served on the well-known path, and 401 responses point at it.
 //
+// The MCP endpoint is served at "/mcp" rather than at the root, so that the
+// resource identifier always has a path component. A bare-origin
+// --public-url has an empty path, which MCP clients that derive resource
+// from new URL(serverUrl).href normalise by appending a trailing slash —
+// the very mismatch audienceAllowed tolerates below. Giving the endpoint (and
+// therefore the resource identifier) a path sidesteps that normalisation,
+// and leaves "/" free for future non-MCP use.
+//
 // The audience check is done in bearerVerifier rather than by the sdk-go
-// verifier so that a trailing-slash variant of the public URL is accepted —
-// see audienceAllowed.
+// verifier so that a trailing-slash variant of the resource is still
+// accepted — see audienceAllowed.
 func (s *Server) HTTPServer(ctx context.Context) (*http.Server, error) {
 	verifier, err := jwksauth.NewVerifierSkipAudience(ctx, s.cfg.Issuer)
 	if err != nil {
 		return nil, fmt.Errorf("building JWKS verifier for %s: %w", s.cfg.Issuer, err)
 	}
 
+	resource := s.cfg.PublicURL + "/mcp"
 	prmURL := s.cfg.PublicURL + "/.well-known/oauth-protected-resource"
 	prm := auth.ProtectedResourceMetadataHandler(&oauthex.ProtectedResourceMetadata{
-		Resource:               s.cfg.PublicURL,
+		Resource:               resource,
 		AuthorizationServers:   []string{s.cfg.Issuer},
 		BearerMethodsSupported: []string{"header"},
 		ResourceName:           "signet-mcp",
@@ -129,7 +138,7 @@ func (s *Server) HTTPServer(ctx context.Context) (*http.Server, error) {
 		&mcp.StreamableHTTPOptions{Logger: s.log},
 	)
 	requireToken := auth.RequireBearerToken(
-		bearerVerifier(verifier, s.cfg.PublicURL),
+		bearerVerifier(verifier, resource),
 		&auth.RequireBearerTokenOptions{
 			ResourceMetadataURL: prmURL,
 		},
@@ -144,11 +153,11 @@ func (s *Server) HTTPServer(ctx context.Context) (*http.Server, error) {
 	})
 	mux.Handle("/.well-known/oauth-protected-resource", prm)
 	mux.Handle("/.well-known/oauth-protected-resource/", prm)
-	mux.Handle("/", requireToken(mcpHandler))
+	mux.Handle("/mcp", requireToken(mcpHandler))
 
 	s.log.Info("serving MCP over streamable HTTP",
 		slog.String("addr", s.cfg.Addr),
-		slog.String("resource", s.cfg.PublicURL),
+		slog.String("resource", resource),
 		slog.String("issuer", s.cfg.Issuer),
 	)
 	return &http.Server{
