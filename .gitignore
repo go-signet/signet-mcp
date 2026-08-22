@@ -47,3 +47,6 @@ signet-credentials.txt
 
 # macOS
 .DS_Store
+
+# Local MCP server config
+.mcp.json
