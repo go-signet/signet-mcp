@@ -188,21 +188,21 @@ services:
 
 ### Configuration
 
-| Flag                            | Env                                      | Default            |                                                                                       |
-| ------------------------------- | ---------------------------------------- | ------------------ | ------------------------------------------------------------------------------------- |
-| `--issuer`                      | `SIGNET_MCP_ISSUER`                      | —                  | Signet issuer URL (required)                                                          |
-| `--transport`                   | `SIGNET_MCP_TRANSPORT`                   | `stdio`            | `stdio` or `http`                                                                     |
-| `--addr`                        | `SIGNET_MCP_ADDR`                        | `localhost:8090`   | HTTP listen address                                                                   |
+| Flag                            | Env                                      | Default            |                                                                                         |
+| ------------------------------- | ---------------------------------------- | ------------------ | --------------------------------------------------------------------------------------- |
+| `--issuer`                      | `SIGNET_MCP_ISSUER`                      | —                  | Signet issuer URL (required)                                                            |
+| `--transport`                   | `SIGNET_MCP_TRANSPORT`                   | `stdio`            | `stdio` or `http`                                                                       |
+| `--addr`                        | `SIGNET_MCP_ADDR`                        | `localhost:8090`   | HTTP listen address                                                                     |
 | `--public-url`                  | `SIGNET_MCP_PUBLIC_URL`                  | `http://<addr>`    | External base URL; MCP endpoint is `<public-url>/mcp`, the RFC 8707 resource identifier |
-| `--toolsets`                    | `SIGNET_MCP_TOOLSETS`                    | `diagnostics,flow` | Enabled toolsets                                                                      |
-| `--client-id`                   | `SIGNET_MCP_CLIENT_ID`                   | —                  | Default OAuth client for flow tools                                                   |
-| `--client-secret`               | `SIGNET_MCP_CLIENT_SECRET`               | —                  | Default client secret                                                                 |
-| `--cimd-allow-private-networks` | `SIGNET_MCP_CIMD_ALLOW_PRIVATE_NETWORKS` | `false`            | Let `signet_validate_cimd` fetch from private/loopback addresses (SSRF guard opt-out) |
-| `--http-timeout`                | —                                        | `15s`              | Outbound request timeout                                                              |
-| `--shutdown-timeout`            | —                                        | `30s`              | Graceful shutdown window                                                              |
-| `--log-level`                   | `SIGNET_MCP_LOG_LEVEL`                   | `info`             | `debug`/`info`/`warn`/`error` (logs go to stderr)                                     |
-| `--log-json`                    | —                                        | `false`            | JSON log output                                                                       |
-| `--version`                     | —                                        | —                  | Print version and exit                                                                |
+| `--toolsets`                    | `SIGNET_MCP_TOOLSETS`                    | `diagnostics,flow` | Enabled toolsets                                                                        |
+| `--client-id`                   | `SIGNET_MCP_CLIENT_ID`                   | —                  | Default OAuth client for flow tools                                                     |
+| `--client-secret`               | `SIGNET_MCP_CLIENT_SECRET`               | —                  | Default client secret                                                                   |
+| `--cimd-allow-private-networks` | `SIGNET_MCP_CIMD_ALLOW_PRIVATE_NETWORKS` | `false`            | Let `signet_validate_cimd` fetch from private/loopback addresses (SSRF guard opt-out)   |
+| `--http-timeout`                | —                                        | `15s`              | Outbound request timeout                                                                |
+| `--shutdown-timeout`            | —                                        | `30s`              | Graceful shutdown window                                                                |
+| `--log-level`                   | `SIGNET_MCP_LOG_LEVEL`                   | `info`             | `debug`/`info`/`warn`/`error` (logs go to stderr)                                       |
+| `--log-json`                    | —                                        | `false`            | JSON log output                                                                         |
+| `--version`                     | —                                        | —                  | Print version and exit                                                                  |
 
 Shutdown is graceful: SIGINT/SIGTERM drains in-flight tool calls and the
 HTTP listener within `--shutdown-timeout`.
