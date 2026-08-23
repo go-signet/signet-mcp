@@ -13,15 +13,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/modelcontextprotocol/go-sdk/auth"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/modelcontextprotocol/go-sdk/oauthex"
-
-	"github.com/go-signet/sdk-go/jwksauth"
-
 	"github.com/go-signet/signet-mcp/internal/config"
 	"github.com/go-signet/signet-mcp/internal/signetapi"
 	"github.com/go-signet/signet-mcp/internal/tools"
+
+	"github.com/go-signet/sdk-go/jwksauth"
+	"github.com/modelcontextprotocol/go-sdk/auth"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/modelcontextprotocol/go-sdk/oauthex"
 )
 
 // Version is stamped at build time via -ldflags.
