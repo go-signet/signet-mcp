@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
-
 	"github.com/go-signet/signet-mcp/internal/signetapi"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // registerFlow adds the `flow` toolset (tools 10–15).

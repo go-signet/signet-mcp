@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/go-signet/sdk-go/oauth"
-
 	"github.com/go-signet/signet-mcp/internal/signetapi"
+
+	"github.com/go-signet/sdk-go/oauth"
 )
 
 // oauthErrorHints maps RFC 6749/8628 error codes to actionable explanations.

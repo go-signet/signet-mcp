@@ -11,10 +11,10 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/appleboy/graceful"
-
 	"github.com/go-signet/signet-mcp/internal/config"
 	"github.com/go-signet/signet-mcp/internal/server"
+
+	"github.com/appleboy/graceful"
 )
 
 func main() {
@@ -27,6 +27,7 @@ func main() {
 		os.Exit(2)
 	}
 	if cfg.ShowVersion {
+		//nolint:forbidigo // The version flag intentionally writes to stdout before starting the MCP transport.
 		fmt.Println("signet-mcp version", server.Version)
 		return
 	}

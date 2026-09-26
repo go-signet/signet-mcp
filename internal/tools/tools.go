@@ -12,12 +12,11 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
-
-	"github.com/go-signet/sdk-go/jwksauth"
-
 	"github.com/go-signet/signet-mcp/internal/config"
 	"github.com/go-signet/signet-mcp/internal/signetapi"
+
+	"github.com/go-signet/sdk-go/jwksauth"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // Deps carries the shared dependencies every tool handler needs.
