@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-signet/signet-mcp/internal/config"
+
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-
-	"github.com/go-signet/signet-mcp/internal/config"
 )
 
 // TestToolRegistration pins the v1 contract: 15 tools across the two default
