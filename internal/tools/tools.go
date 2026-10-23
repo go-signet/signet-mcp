@@ -126,9 +126,6 @@ func refusePrivateAddr(_, address string, _ syscall.RawConn) error {
 	return nil
 }
 
-// boolPtr is a convenience for ToolAnnotations pointer fields.
-func boolPtr(b bool) *bool { return &b }
-
 // readOnly marks a tool that never modifies server state.
 func readOnly(title string) *mcp.ToolAnnotations {
 	return &mcp.ToolAnnotations{Title: title, ReadOnlyHint: true}
@@ -138,7 +135,7 @@ func readOnly(title string) *mcp.ToolAnnotations {
 func write(title string, idempotent bool) *mcp.ToolAnnotations {
 	return &mcp.ToolAnnotations{
 		Title:           title,
-		DestructiveHint: boolPtr(false),
+		DestructiveHint: new(false),
 		IdempotentHint:  idempotent,
 	}
 }

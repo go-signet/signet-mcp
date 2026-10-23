@@ -1,6 +1,6 @@
 module github.com/go-signet/signet-mcp
 
-go 1.25.10
+go 1.26.10
 
 require (
 	github.com/appleboy/graceful v1.3.0
