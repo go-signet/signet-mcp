@@ -4,7 +4,7 @@ go 1.26.10
 
 require (
 	github.com/appleboy/graceful v1.3.0
-	github.com/go-jose/go-jose/v4 v4.1.4
+	github.com/go-jose/go-jose/v4 v4.1.6
 	github.com/go-signet/sdk-go v1.1.0
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 )
