@@ -34,14 +34,11 @@ var oauthErrorHints = map[string]string{
 func explainOAuthError(what string, err error) error {
 	var code, desc string
 	var status int
-	apiErr := &signetapi.APIError{}
-	sdkErr := &oauth.Error{}
-	switch {
-	case errors.As(err, &apiErr):
+	if apiErr, ok := errors.AsType[*signetapi.APIError](err); ok {
 		code, desc, status = apiErr.Code, apiErr.Description, apiErr.StatusCode
-	case errors.As(err, &sdkErr):
+	} else if sdkErr, ok := errors.AsType[*oauth.Error](err); ok {
 		code, desc, status = sdkErr.Code, sdkErr.Description, sdkErr.StatusCode
-	default:
+	} else {
 		return fmt.Errorf("%s failed: %w", what, err)
 	}
 	msg := fmt.Sprintf("%s failed: Signet returned %q (HTTP %d)", what, code, status)

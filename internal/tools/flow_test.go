@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -61,7 +60,7 @@ func fakeFlowServer(t *testing.T, tokenHandler http.HandlerFunc) (*httptest.Serv
 func TestDeviceFlowStartForwardsClientSecret(t *testing.T) {
 	srv, lastForm := fakeFlowServer(t, nil)
 	d := testDeps(t, srv.URL)
-	_, out, err := d.deviceFlowStart(context.Background(), nil, deviceStartIn{
+	_, out, err := d.deviceFlowStart(t.Context(), nil, deviceStartIn{
 		ClientID: "conf-client", ClientSecret: "conf-secret",
 	})
 	if err != nil {
@@ -90,7 +89,7 @@ func TestDeviceFlowPollSlowDownDoesNotHotLoop(t *testing.T) {
 		}
 	})
 	d := testDeps(t, srv.URL)
-	_, out, err := d.deviceFlowPoll(context.Background(), nil, devicePollIn{
+	_, out, err := d.deviceFlowPoll(t.Context(), nil, devicePollIn{
 		DeviceCode: "dc", ClientID: "c", WaitSeconds: 0,
 	})
 	if err != nil {

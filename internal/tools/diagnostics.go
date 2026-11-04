@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -139,7 +138,7 @@ func diffMetadata(asMeta, oidcMeta map[string]any) []string {
 	for k := range keys {
 		sorted = append(sorted, k)
 	}
-	sort.Strings(sorted)
+	slices.Sort(sorted)
 	for _, k := range sorted {
 		av, aok := asMeta[k]
 		ov, ook := oidcMeta[k]
@@ -434,7 +433,7 @@ type tokeninfoOut struct {
 	UserID      string `json:"user_id,omitempty"`
 	ClientID    string `json:"client_id,omitempty"`
 	Scope       string `json:"scope,omitempty"`
-	Exp         int64  `json:"exp,omitempty"`
+	Exp         int64  `json:"exp,omitzero"`
 	ExpiresAt   string `json:"expires_at,omitempty"   jsonschema:"RFC 3339 rendering of exp"`
 	Iss         string `json:"iss,omitempty"`
 	SubjectType string `json:"subject_type,omitempty"`
@@ -489,9 +488,9 @@ type introspectOut struct {
 	ClientID  string `json:"client_id,omitempty"`
 	Username  string `json:"username,omitempty"`
 	TokenType string `json:"token_type,omitempty"`
-	Exp       int64  `json:"exp,omitempty"`
+	Exp       int64  `json:"exp,omitzero"`
 	ExpiresAt string `json:"expires_at,omitempty"`
-	Iat       int64  `json:"iat,omitempty"`
+	Iat       int64  `json:"iat,omitzero"`
 	Sub       string `json:"sub,omitempty"`
 	Iss       string `json:"iss,omitempty"`
 	Jti       string `json:"jti,omitempty"`
@@ -544,9 +543,9 @@ type userinfoOut struct {
 	Name              string `json:"name,omitempty"`
 	PreferredUsername string `json:"preferred_username,omitempty"`
 	Email             string `json:"email,omitempty"`
-	EmailVerified     bool   `json:"email_verified,omitempty"`
+	EmailVerified     bool   `json:"email_verified,omitzero"`
 	Picture           string `json:"picture,omitempty"`
-	UpdatedAt         int64  `json:"updated_at,omitempty"`
+	UpdatedAt         int64  `json:"updated_at,omitzero"`
 	SubjectType       string `json:"subject_type,omitempty"`
 }
 

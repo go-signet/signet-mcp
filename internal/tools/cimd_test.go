@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -53,7 +52,7 @@ func TestValidateCIMDHappyPath(t *testing.T) {
 	})
 	d := testDeps(t, "https://unused.example.com")
 	_, out, err := d.validateCIMD(
-		context.Background(),
+		t.Context(),
 		nil,
 		validateCIMDIn{URL: srv.URL + "/client.json"},
 	)
@@ -87,7 +86,7 @@ func TestValidateCIMDRejectsSecretAndMismatch(t *testing.T) {
 	})
 	d := testDeps(t, "https://unused.example.com")
 	_, out, err := d.validateCIMD(
-		context.Background(),
+		t.Context(),
 		nil,
 		validateCIMDIn{URL: srv.URL + "/client.json"},
 	)
@@ -114,7 +113,7 @@ func TestValidateCIMDFetchFailure(t *testing.T) {
 	t.Cleanup(srv.Close)
 	d := testDeps(t, "https://unused.example.com")
 	_, out, err := d.validateCIMD(
-		context.Background(),
+		t.Context(),
 		nil,
 		validateCIMDIn{URL: srv.URL + "/missing.json"},
 	)
@@ -144,7 +143,7 @@ func TestValidateCIMDNonJSONContentType(t *testing.T) {
 	t.Cleanup(srv.Close)
 	d := testDeps(t, "https://unused.example.com")
 	_, out, err := d.validateCIMD(
-		context.Background(),
+		t.Context(),
 		nil,
 		validateCIMDIn{URL: srv.URL + "/client.json"},
 	)
@@ -191,7 +190,7 @@ func TestValidateCIMDBlocksPrivateAddresses(t *testing.T) {
 	d := NewDeps(api, cfg, slog.New(slog.DiscardHandler))
 
 	_, out, err := d.validateCIMD(
-		context.Background(),
+		t.Context(),
 		nil,
 		validateCIMDIn{URL: srv.URL + "/client.json"},
 	)

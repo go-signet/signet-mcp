@@ -70,10 +70,10 @@ type tokenOut struct {
 	AccessToken       string         `json:"access_token"`
 	RefreshToken      string         `json:"refresh_token,omitempty"`
 	TokenType         string         `json:"token_type,omitempty"`
-	ExpiresIn         int            `json:"expires_in,omitempty"`
+	ExpiresIn         int            `json:"expires_in,omitzero"`
 	ExpiresAt         string         `json:"expires_at,omitempty"`
 	Scope             string         `json:"scope,omitempty"`
-	IDTokenIssued     bool           `json:"id_token_issued,omitempty"`
+	IDTokenIssued     bool           `json:"id_token_issued,omitzero"`
 	AccessTokenClaims map[string]any `json:"access_token_claims,omitempty" jsonschema:"unverified decoded JWT claims of the access token"`
 }
 
@@ -168,11 +168,11 @@ func (d *Deps) deviceFlowStart(
 // --- 11. signet_device_flow_poll ----------------------------------------
 
 type devicePollIn struct {
-	DeviceCode      string `json:"device_code"                jsonschema:"the device_code returned by signet_device_flow_start"`
-	ClientID        string `json:"client_id,omitempty"        jsonschema:"OAuth client_id; defaults to the configured client"`
-	ClientSecret    string `json:"client_secret,omitempty"    jsonschema:"client_secret, only for confidential clients"`
-	WaitSeconds     int    `json:"wait_seconds,omitempty"     jsonschema:"0 (default) polls once; otherwise keep polling up to this many seconds (max 300)"`
-	IntervalSeconds int    `json:"interval_seconds,omitempty" jsonschema:"seconds between polls, default 5; raised automatically on slow_down"`
+	DeviceCode      string `json:"device_code"               jsonschema:"the device_code returned by signet_device_flow_start"`
+	ClientID        string `json:"client_id,omitempty"       jsonschema:"OAuth client_id; defaults to the configured client"`
+	ClientSecret    string `json:"client_secret,omitempty"   jsonschema:"client_secret, only for confidential clients"`
+	WaitSeconds     int    `json:"wait_seconds,omitzero"     jsonschema:"0 (default) polls once; otherwise keep polling up to this many seconds (max 300)"`
+	IntervalSeconds int    `json:"interval_seconds,omitzero" jsonschema:"seconds between polls, default 5; raised automatically on slow_down"`
 }
 
 type devicePollOut struct {
@@ -211,8 +211,8 @@ func (d *Deps) deviceFlowPoll(
 				Token:       &t,
 			}, nil
 		}
-		apiErr := &signetapi.APIError{}
-		if !errors.As(err, &apiErr) {
+		apiErr, matched := errors.AsType[*signetapi.APIError](err)
+		if !matched {
 			return nil, devicePollOut{}, explainOAuthError("device flow polling", err)
 		}
 		switch apiErr.Code {
