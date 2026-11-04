@@ -217,7 +217,7 @@ type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token,omitempty"`
 	TokenType    string `json:"token_type,omitempty"`
-	ExpiresIn    int    `json:"expires_in,omitempty"`
+	ExpiresIn    int    `json:"expires_in,omitzero"`
 	Scope        string `json:"scope,omitempty"`
 	IDToken      string `json:"id_token,omitempty"`
 }
@@ -297,7 +297,7 @@ type DeviceAuthResponse struct {
 	VerificationURI         string `json:"verification_uri"`
 	VerificationURIComplete string `json:"verification_uri_complete,omitempty"`
 	ExpiresIn               int    `json:"expires_in"`
-	Interval                int    `json:"interval,omitempty"`
+	Interval                int    `json:"interval,omitzero"`
 }
 
 // DeviceCodeRequest starts an RFC 8628 device authorization, optionally

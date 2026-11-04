@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
@@ -33,7 +32,7 @@ func TestToolRegistration(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	ct, st := mcp.NewInMemoryTransports()
 	session, err := srv.mcp.Connect(ctx, st, nil)
 	if err != nil {
@@ -114,7 +113,7 @@ func TestHTTPServerHealthz(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	httpSrv, err := srv.HTTPServer(context.Background())
+	httpSrv, err := srv.HTTPServer(t.Context())
 	if err != nil {
 		t.Fatalf("HTTPServer: %v", err)
 	}
@@ -155,7 +154,7 @@ func TestDiagnosticsOnlyToolset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	ct, st := mcp.NewInMemoryTransports()
 	if _, err := srv.mcp.Connect(ctx, st, nil); err != nil {
 		t.Fatalf("server connect: %v", err)
@@ -267,7 +266,7 @@ func TestHTTPServerAudience(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	httpSrv, err := srv.HTTPServer(context.Background())
+	httpSrv, err := srv.HTTPServer(t.Context())
 	if err != nil {
 		t.Fatalf("HTTPServer: %v", err)
 	}

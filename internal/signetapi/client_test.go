@@ -1,7 +1,6 @@
 package signetapi
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -67,7 +66,7 @@ func TestTokenRequestSendsResourceAndCredentials(t *testing.T) {
 	form := url.Values{}
 	form.Set("grant_type", "client_credentials")
 	tok, err := c.TokenRequest(
-		context.Background(),
+		t.Context(),
 		form,
 		"cid",
 		"csecret",
@@ -97,9 +96,9 @@ func TestTokenRequestOAuthError(t *testing.T) {
 	}
 	form := url.Values{}
 	form.Set("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
-	_, err = c.TokenRequest(context.Background(), form, "cid", "", nil)
-	apiErr := &APIError{}
-	if !errors.As(err, &apiErr) {
+	_, err = c.TokenRequest(t.Context(), form, "cid", "", nil)
+	apiErr, matched := errors.AsType[*APIError](err)
+	if !matched {
 		t.Fatalf("want *APIError, got %T: %v", err, err)
 	}
 	if apiErr.Code != "authorization_pending" || apiErr.StatusCode != http.StatusBadRequest {
@@ -115,7 +114,7 @@ func TestPostFormAcceptsEmptyBody(t *testing.T) {
 	}
 	form := url.Values{}
 	form.Set("token", "whatever")
-	if err := c.PostForm(context.Background(), srv.URL+"/oauth/revoke", form, nil); err != nil {
+	if err := c.PostForm(t.Context(), srv.URL+"/oauth/revoke", form, nil); err != nil {
 		t.Errorf("revocation with empty 200 body should succeed: %v", err)
 	}
 }
@@ -131,7 +130,7 @@ func TestHealthUnhealthy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	status, doc, err := c.Health(context.Background())
+	status, doc, err := c.Health(t.Context())
 	if err != nil {
 		t.Fatalf("Health: %v", err)
 	}
@@ -159,7 +158,7 @@ func TestGetJSONRejectsOversizedBody(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = c.GetJSON(context.Background(), srv.URL+"/big.json")
+	_, err = c.GetJSON(t.Context(), srv.URL+"/big.json")
 	if err == nil || !strings.Contains(err.Error(), "byte cap") {
 		t.Errorf("want explicit size-cap error, got %v", err)
 	}
